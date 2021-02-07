@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+            </div>
+            <div class="field">
+                        <h1 class="tagline">Ошибка</h1>
+                <h2 class="lead">
+                    Вы выбрали некорректный путь. Попробуйте <a href="{{ url_for('create_url') }}">создать ссылку снова.</a>
+                </h2>
+            </div>
+{% endblock %}

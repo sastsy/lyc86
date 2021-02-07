@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    tbody tr:hover {
+        background: #ffffe0;
+    }
+
+    tbody tr button {
+  width: 36px;
+  height: 36px;
+  margin-left: 1rem;
+  background-image: url(https://s3-us-west-2.amazonaws.com/s.cdpn.io/4273/trashcan.svg);
+  border: none;
+  background-position: center 4px;
+  background-repeat: no-repeat;
+  background-size: 25px 25px;
+  opacity: .6;
+  transition: .5s;
+}
+tbody tr button:hover {
+  opacity: .9;
+  cursor: pointer;
+}
+
+</style>
+<table class="table">
+                <thead>
+                    <tr>
+                        <th>Original URL</th>
+                        <th>Short URL</th>
+                        <th>Дата создания</th>
+                        <th>Visits</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tfoot>
+                    <tr>
+                        <th>Original URL</th>
+                        <th>Short URL</th>
+                        <th>Дата создания</th>
+                        <th>Visits</th>
+                        <th></th>
+                    </tr>
+                </tfoot>
+                <tbody>
+                <form method="POST" action="{{ url_for('delete_link') }}">
+                    {% for link in links %}
+                    <tr>
+                        <td><a href="{{ link.original_url }}"> {{ link.original_url }} </a></td>
+                        <td><a href="{{ url_for('redirect_to_url', short_url=link.short_url, _external=True) }}"> {{ url_for('redirect_to_url', short_url=link.short_url, _external=True) }} </a></td>
+                        <td> {{ link.date_created  }} </td>
+                        <td> {{ link.visits }} </td>
+                        <td><button type="submit" name="url_to_delete" value="{{ link.id }}"></button></td>
+                    </tr>
+                    {% endfor %}
+                </form>
+                </tbody>
+            </table>
+<script></script>
+{% endblock %}
