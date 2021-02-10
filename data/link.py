@@ -3,7 +3,7 @@ import string
 from random import choices
 
 import flask_sqlalchemy
-from main import db
+from app import db
 
 
 """def generate_short_link():

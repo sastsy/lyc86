@@ -1,6 +1,6 @@
 import datetime
 import flask_sqlalchemy
-from main import db
+from app import db
 from flask_login import UserMixin
 from sqlalchemy import orm
 from werkzeug.security import generate_password_hash, check_password_hash

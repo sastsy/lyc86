@@ -25,8 +25,7 @@ login_manager.init_app(app)
 
 def main():
     db.create_all()
-    if 'liveconsole' not in gethostname():
-        app.run(debug=True, host='0.0.0.0', port=80)
+    app.run(debug=True, host='0.0.0.0', port=80)
 
 
 @app.route("/")
