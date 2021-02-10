@@ -1,29 +1,25 @@
 import datetime
-import sqlalchemy
+import flask_sqlalchemy
+from main import db
 from flask_login import UserMixin
 from sqlalchemy import orm
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from .db_session import SqlAlchemyBase
 
+class User(db.Model, UserMixin):
 
-class User(SqlAlchemyBase, UserMixin):
-    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=True)
+    email = db.Column(db.String, index=True, unique=True, nullable=True)
+    hashed_password = db.Column(db.String, nullable=True)
+    created_date = db.Column(db.DateTime, default=datetime.datetime.now)
+    links = db.relationship('Link', backref='author', lazy=True)
 
-    id = sqlalchemy.Column(sqlalchemy.Integer,
-                           primary_key=True, autoincrement=True)
-    name = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    about = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    email = sqlalchemy.Column(sqlalchemy.String,
-                              index=True, unique=True, nullable=True)
-    hashed_password = sqlalchemy.Column(sqlalchemy.String, nullable=True)
-    created_date = sqlalchemy.Column(sqlalchemy.DateTime,
-                                     default=datetime.datetime.now)
+    def __repr__(self):
+        return f"User('{self.name}', '{self.email}', '{self.created_date}')"
 
     def set_password(self, password):
         self.hashed_password = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.hashed_password, password)
-
-    link = orm.relation("Link", back_populates='user')

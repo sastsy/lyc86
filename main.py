@@ -1,43 +1,45 @@
+from datetime import datetime
+
 from flask import Flask, render_template, request
-from flask_login import LoginManager, login_required, login_user, logout_user, current_user
+from flask_login import LoginManager, login_required, login_user, logout_user, current_user, UserMixin
 from flask_wtf import FlaskForm
+from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import redirect
 from wtforms import PasswordField, StringField, TextAreaField, SubmitField, BooleanField
 from wtforms.fields.html5 import EmailField
 from wtforms.validators import DataRequired
-import sqlalchemy
+from socket import gethostname
+from flask_sqlalchemy import SQLAlchemy
 
-from data import db_session
-from data.users import User
-from data.link import Link
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
-
-
-def main():
-    db_session.global_init("db/blogs.sqlite")
-    app.run(debug=True, host='0.0.0.0', port=80)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db/site.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 
 
+def main():
+    db.create_all()
+    if 'liveconsole' not in gethostname():
+        app.run(debug=True, host='0.0.0.0', port=80)
+
+
 @app.route("/")
 def index():
-    session = db_session.create_session()
-    # news = session.query(News).filter(News.is_private != True)
     return render_template("index.html")
 
 
 @app.route('/<short_url>')
 def redirect_to_url(short_url):
-    session = db_session.create_session()
-    link = session.query(Link).filter_by(short_url=short_url).first()
+    link = db.session.query(Link).filter_by(short_url=short_url).first()
 
     link.visits = link.visits + 1
-    session.commit()
+    db.session.commit()
 
     return redirect(link.original_url)
 
@@ -51,16 +53,15 @@ def create_url():
 @app.route('/add_link', methods=['POST'])
 @login_required
 def add_link():
-    session = db_session.create_session()
     original_url = request.form['original_url']
     short_url = request.form['new_path']
     if short_url in ['', 'create_url', 'add_link', 'stats', 'register', 'login', 'logout', 'profile'] or\
-            original_url == '' or session.query(Link).filter(short_url == Link.short_url).first():
+            original_url == '' or db.session.query(Link).filter(short_url == Link.short_url).first():
         return render_template('link_added_wrong.html', new_title='ОШИБКА')
     user_id = current_user.id
     link = Link(original_url=original_url, user_id=user_id, short_url=short_url)
-    session.add(link)
-    session.commit()
+    db.session.add(link)
+    db.session.commit()
 
     return render_template('link_added.html', new_link=link.short_url, original_url=link.original_url,
                            new_title='ГОТОВО!', description='ТЕПЕРЬ ВЫ МОЖЕТЕ ПОЛЬЗОВАТЬСЯ НОВОЙ URL')
@@ -69,9 +70,7 @@ def add_link():
 @app.route('/stats')
 @login_required
 def stats():
-    session = db_session.create_session()
-
-    links = session.query(Link).filter(current_user.id == Link.user_id)[::-1]
+    links = db.session.query(Link).filter(current_user.id == Link.user_id)[::-1]
 
     return render_template('stats.html', links=links, new_title='ХРАНИЛИЩЕ')
 
@@ -79,11 +78,10 @@ def stats():
 @app.route('/delete_link', methods=['POST'])
 @login_required
 def delete_link():
-    session = db_session.create_session()
     url_to_delete = request.form['url_to_delete']
 
-    session.query(Link).filter(Link.id == url_to_delete).delete()
-    session.commit()
+    db.session.query(Link).filter(Link.id == url_to_delete).delete()
+    db.session.commit()
 
     return render_template('delete_link.html', new_title='УСПЕШНО')
 
@@ -93,7 +91,6 @@ class RegisterForm(FlaskForm):
     password = PasswordField('Пароль', validators=[DataRequired()])
     password_again = PasswordField('Повторите пароль', validators=[DataRequired()])
     name = StringField('Имя пользователя', validators=[DataRequired()])
-    about = TextAreaField("Немного о себе")
     submit = SubmitField('Войти')
 
 
@@ -105,27 +102,25 @@ def register():
             return render_template('register.html', title='Регистрация',
                                    form=form,
                                    message="Пароли не совпадают")
-        session = db_session.create_session()
-        if session.query(User).filter(User.email == form.email.data).first():
+        if db.session.query(User).filter(User.email == form.email.data).first():
             return render_template('register.html', title='Регистрация',
                                    form=form,
                                    message="Такой пользователь уже есть")
-        if session.query(User).filter(User.name == form.name.data).first():
+        if db.session.query(User).filter(User.name == form.name.data).first():
             return render_template('register.html', title='Регистрация',
                                    form=form,
                                    message="Пользователь с таким именем уже есть")
-        user = User(name=form.name.data, email=form.email.data, about=form.about.data)
+        user = User(name=form.name.data, email=form.email.data)
         user.set_password(form.password.data)
-        session.add(user)
-        session.commit()
+        db.session.add(user)
+        db.session.commit()
         return redirect('/login')
     return render_template('register.html', title='Регистрация', form=form, new_title='РЕГИСТРАЦИЯ')
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    session = db_session.create_session()
-    return session.query(User).get(user_id)
+    return db.session.query(User).get(user_id)
 
 
 class LoginForm(FlaskForm):
@@ -139,8 +134,7 @@ class LoginForm(FlaskForm):
 def login():
     form = LoginForm()
     if form.validate_on_submit():
-        session = db_session.create_session()
-        user = session.query(User).filter(User.email == form.email.data).first()
+        user = db.session.query(User).filter(User.email == form.email.data).first()
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             return redirect("/create_url")
@@ -155,6 +149,32 @@ def login():
 def logout():
     logout_user()
     return redirect("/")
+
+
+class User(db.Model, UserMixin):
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=True)
+    email = db.Column(db.String, index=True, unique=True, nullable=True)
+    hashed_password = db.Column(db.String, nullable=True)
+    created_date = db.Column(db.DateTime, default=datetime.now)
+    links = db.relationship('Link', backref='author', lazy=True)
+
+    def set_password(self, password):
+        self.hashed_password = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.hashed_password, password)
+
+
+class Link(db.Model):
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    original_url = db.Column(db.String(512))
+    short_url = db.Column(db.String(3))
+    visits = db.Column(db.Integer, default=0)
+    date_created = db.Column(db.DateTime, default=datetime.now)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"))
 
 
 if __name__ == '__main__':
